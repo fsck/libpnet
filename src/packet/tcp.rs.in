@@ -148,7 +148,6 @@ fn tcp_options_length(tcp: &TcpPacket) -> usize {
   tcp.get_data_offset() as usize * 4 - 20
 }
 
-
 /// Calculate the checksum for a packet built on IPv4
 pub fn ipv4_checksum(packet: &TcpPacket,
                      ipv4_source: Ipv4Addr,
