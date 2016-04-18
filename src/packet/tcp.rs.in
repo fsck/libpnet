@@ -16,33 +16,39 @@ use pnet_macros_support::types::*;
 
 use std::net::{Ipv4Addr, Ipv6Addr};
 
-/// NS – ECN-nonce concealment protection (experimental: see RFC 3540).
-pub const FLAG_NS: u9be  = 0b100000000;
-/// CWR – Congestion Window Reduced (CWR) flag is set by the sending
-/// host to indicate that it received a TCP segment with the ECE flag set
-/// and had responded in congestion control mechanism (added to header by RFC 3168).
-pub const FLAG_CWR: u9be = 0b010000000;
-/// ECE – ECN-Echo has a dual role, depending on the value of the
-/// SYN flag. It indicates:
-/// If the SYN flag is set (1), that the TCP peer is ECN capable.
-/// If the SYN flag is clear (0), that a packet with Congestion Experienced
-/// flag set (ECN=11) in IP header received during normal transmission
-/// (added to header by RFC 3168).
-pub const FLAG_ECE: u9be = 0b001000000;
-/// URG – indicates that the Urgent pointer field is significant
-pub const FLAG_URG: u9be = 0b000100000;
-/// ACK – indicates that the Acknowledgment field is significant.
-/// All packets after the initial SYN packet sent by the client should have this flag set.
-pub const FLAG_ACK: u9be = 0b000010000;
-/// PSH – Push function. Asks to push the buffered data to the receiving application.
-pub const FLAG_PSH: u9be = 0b000001000;
-/// RST – Reset the connection
-pub const FLAG_RST: u9be = 0b000000100;
-/// SYN – Synchronize sequence numbers. Only the first packet sent from each end
-/// should have this flag set.
-pub const FLAG_SYN: u9be = 0b000000010;
-/// FIN – No more data from sender
-pub const FLAG_FIN: u9be = 0b000000001;
+/// TCP flags
+#[allow(non_snake_case)]
+#[allow(non_upper_case_globals)]
+pub mod TcpFlags {
+    use pnet_macros_support::types::*;
+    /// NS – ECN-nonce concealment protection (experimental: see RFC 3540).
+    pub const NS: u9be  = 0b100000000;
+    /// CWR – Congestion Window Reduced (CWR) flag is set by the sending
+    /// host to indicate that it received a TCP segment with the ECE flag set
+    /// and had responded in congestion control mechanism (added to header by RFC 3168).
+    pub const CWR: u9be = 0b010000000;
+    /// ECE – ECN-Echo has a dual role, depending on the value of the
+    /// SYN flag. It indicates:
+    /// If the SYN flag is set (1), that the TCP peer is ECN capable.
+    /// If the SYN flag is clear (0), that a packet with Congestion Experienced
+    /// flag set (ECN=11) in IP header received during normal transmission
+    /// (added to header by RFC 3168).
+    pub const ECE: u9be = 0b001000000;
+    /// URG – indicates that the Urgent pointer field is significant
+    pub const URG: u9be = 0b000100000;
+    /// ACK – indicates that the Acknowledgment field is significant.
+    /// All packets after the initial SYN packet sent by the client should have this flag set.
+    pub const ACK: u9be = 0b000010000;
+    /// PSH – Push function. Asks to push the buffered data to the receiving application.
+    pub const PSH: u9be = 0b000001000;
+    /// RST – Reset the connection
+    pub const RST: u9be = 0b000000100;
+    /// SYN – Synchronize sequence numbers. Only the first packet sent from each end
+    /// should have this flag set.
+    pub const SYN: u9be = 0b000000010;
+    /// FIN – No more data from sender
+    pub const FIN: u9be = 0b000000001;
+}
 
 /// Represents a TCP Packet
 #[packet]
@@ -110,7 +116,7 @@ pub struct TcpOption {
 }
 
 impl TcpOption {
-    /// Create NOP option
+    /// NOP: This may be used to align option fields on 32-bit boundaries for better performance.
     pub fn nop() -> Self {
         TcpOption {
              number: TcpOptionNumbers::NOP,
@@ -119,7 +125,9 @@ impl TcpOption {
         }
     }
 
-    /// Create Timestamp option
+    /// Timestamp: TCP timestamps, defined in RFC 1323, can help TCP determine in which order
+    /// packets were sent. TCP timestamps are not normally aligned to the system clock and
+    /// start at some random value.
     pub fn timestamp(my: u32, their: u32) -> Self {
         let mut data = vec![];
         data.extend_from_slice(&my.octets()[..]);
@@ -132,7 +140,8 @@ impl TcpOption {
         }
     }
 
-    /// Create Maximum Segment Size option
+    /// MSS: The maximum segment size (MSS) is the largest amount of data, specified in bytes,
+    /// that TCP is willing to receive in a single segment.
     pub fn mss(val: u16) -> Self {
         let mut data = vec![];
         data.extend_from_slice(&val.octets()[..]);
@@ -144,7 +153,8 @@ impl TcpOption {
         }
     }
 
-    /// Create Window Scale option
+    /// Window scale: The TCP window scale option, as defined in RFC 1323, is an option used to
+    /// increase the maximum window size from 65,535 bytes to 1 gigabyte.
     pub fn wscale(val: u8) -> Self {
         TcpOption {
             number: TcpOptionNumbers::WSCALE,
@@ -153,7 +163,9 @@ impl TcpOption {
         }
     }
 
-    /// Selective acknowledgements permitted option
+    /// Selective acknowledgment (SACK) option, defined in RFC 2018 allows the receiver to acknowledge
+    /// discontinuous blocks of packets which were received correctly. This options enables use of
+    /// SACK during negotiation.
     pub fn sack_perm() -> Self {
         TcpOption {
             number: TcpOptionNumbers::SACK_PERMITTED,
@@ -162,7 +174,10 @@ impl TcpOption {
         }
     }
 
-    /// Selective acknowledgements option
+    /// Selective acknowledgment (SACK) option, defined in RFC 2018 allows the receiver to acknowledge
+    /// discontinuous blocks of packets which were received correctly. The acknowledgement can specify
+    /// a number of SACK blocks, where each SACK block is conveyed by the starting and ending sequence
+    /// numbers of a contiguous range that the receiver correctly received.
     pub fn selective_ack(acks: &[u32]) -> Self {
         let mut data = vec![];
         for ack in acks {
@@ -297,8 +312,8 @@ fn tcp_header_ipv4_test() {
         tcp_header.set_acknowledgement(0x944bb276);
         assert_eq!(tcp_header.get_acknowledgement(), 0x944bb276);
 
-        tcp_header.set_flags(FLAG_PSH | FLAG_ACK);
-        assert_eq!(tcp_header.get_flags(), FLAG_PSH | FLAG_ACK);
+        tcp_header.set_flags(TcpFlags::PSH | TcpFlags::ACK);
+        assert_eq!(tcp_header.get_flags(), TcpFlags::PSH | TcpFlags::ACK);
 
         tcp_header.set_window(4015);
         assert_eq!(tcp_header.get_window(), 4015);
